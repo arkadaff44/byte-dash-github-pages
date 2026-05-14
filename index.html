@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Byte Dash</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101820;
+      --panel: #17242f;
+      --panel-2: #203342;
+      --text: #f6f3e8;
+      --muted: #b7c1c8;
+      --accent: #f7c948;
+      --good: #54d39b;
+      --bad: #f06a6a;
+      --blue: #64b5f6;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #101820 0%, #0c1218 100%);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    main {
+      width: min(980px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    header,
+    footer,
+    .game-shell {
+      background: var(--panel);
+      border: 1px solid #2d4658;
+      border-radius: 8px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 3vw, 2.3rem);
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(80px, 1fr));
+      gap: 8px;
+      min-width: min(360px, 100%);
+    }
+
+    .stat {
+      background: var(--panel-2);
+      border: 1px solid #35536a;
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+
+    .stat strong {
+      display: block;
+      color: var(--accent);
+      font-size: 1.25rem;
+      line-height: 1.1;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+    }
+
+    .game-shell {
+      position: relative;
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    canvas {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: block;
+      background: #0d151c;
+      border-radius: 6px;
+      border: 1px solid #314c5f;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 12px;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(8, 13, 18, 0.74);
+      backdrop-filter: blur(5px);
+    }
+
+    .overlay[hidden] {
+      display: none;
+    }
+
+    .panel {
+      width: min(560px, 100%);
+      background: #14212b;
+      border: 1px solid #36566d;
+      border-radius: 8px;
+      padding: 22px;
+      text-align: center;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      letter-spacing: 0;
+    }
+
+    .panel p {
+      margin: 8px 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    button {
+      margin-top: 14px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #18202a;
+      font-weight: 800;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    button:focus-visible {
+      outline: 3px solid var(--blue);
+      outline-offset: 3px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--text);
+    }
+
+    .controls span {
+      background: var(--panel-2);
+      border: 1px solid #35536a;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 0.9rem;
+    }
+
+    footer {
+      padding: 12px 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 12px;
+      }
+
+      header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .stats,
+      .controls {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Byte Dash</h1>
+        <p class="subtitle">Collect stars, avoid bugs, and reach the deploy gate before time runs out.</p>
+      </div>
+      <div class="stats" aria-label="Game status">
+        <div class="stat"><strong id="score">0</strong><span>Score</span></div>
+        <div class="stat"><strong id="lives">3</strong><span>Lives</span></div>
+        <div class="stat"><strong id="time">60</strong><span>Time</span></div>
+      </div>
+    </header>
+
+    <section class="game-shell" aria-label="Byte Dash game">
+      <canvas id="game" width="960" height="540"></canvas>
+      <div id="overlay" class="overlay">
+        <div class="panel">
+          <h2 id="overlayTitle">Ready to Deploy?</h2>
+          <p id="overlayText">Move through the grid, collect all 8 stars, then enter the green GitHub Pages gate.</p>
+          <div class="controls" aria-label="Controls">
+            <span>Arrow keys</span>
+            <span>WASD</span>
+            <span>Space: dash</span>
+            <span>P: pause</span>
+          </div>
+          <button id="startButton" type="button">Start Game</button>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Assignment: Making a Game and Publish It as Github Pages. This game is original HTML, CSS, and JavaScript. No external assets were used.
+    </footer>
+  </main>
+
+  <script>
+    const canvas = document.querySelector("#game");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.querySelector("#score");
+    const livesEl = document.querySelector("#lives");
+    const timeEl = document.querySelector("#time");
+    const overlay = document.querySelector("#overlay");
+    const overlayTitle = document.querySelector("#overlayTitle");
+    const overlayText = document.querySelector("#overlayText");
+    const startButton = document.querySelector("#startButton");
+
+    const keys = new Set();
+    const world = { width: 960, height: 540 };
+    const player = { x: 74, y: 76, size: 26, speed: 205, dash: 0, invulnerable: 0 };
+    const gate = { x: 860, y: 438, w: 56, h: 72 };
+    const walls = [
+      { x: 150, y: 0, w: 26, h: 330 },
+      { x: 150, y: 420, w: 26, h: 120 },
+      { x: 300, y: 130, w: 26, h: 410 },
+      { x: 450, y: 0, w: 26, h: 260 },
+      { x: 450, y: 352, w: 26, h: 188 },
+      { x: 620, y: 110, w: 26, h: 430 },
+      { x: 760, y: 0, w: 26, h: 330 }
+    ];
+    const baseStars = [
+      [86, 448], [242, 88], [244, 380], [392, 86],
+      [396, 454], [566, 306], [714, 86], [840, 380]
+    ];
+    const bugs = [
+      { x: 226, y: 250, vx: 120, vy: 0, minX: 200, maxX: 410, r: 18 },
+      { x: 548, y: 82, vx: 0, vy: 125, minY: 56, maxY: 318, r: 18 },
+      { x: 706, y: 426, vx: 125, vy: 0, minX: 680, maxX: 900, r: 18 },
+      { x: 842, y: 190, vx: 0, vy: 110, minY: 86, maxY: 300, r: 18 }
+    ];
+
+    let stars = [];
+    let state = "menu";
+    let score = 0;
+    let lives = 3;
+    let timeLeft = 60;
+    let lastTime = 0;
+    let timerAccumulator = 0;
+
+    function resetGame() {
+      player.x = 74;
+      player.y = 76;
+      player.dash = 0;
+      player.invulnerable = 0;
+      score = 0;
+      lives = 3;
+      timeLeft = 60;
+      timerAccumulator = 0;
+      stars = baseStars.map(([x, y]) => ({ x, y, r: 11, collected: false }));
+      updateHud();
+    }
+
+    function updateHud() {
+      scoreEl.textContent = score;
+      livesEl.textContent = lives;
+      timeEl.textContent = Math.max(0, Math.ceil(timeLeft));
+    }
+
+    function rectsOverlap(a, b) {
+      return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    }
+
+    function circleRectOverlap(circle, rect) {
+      const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
+      const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
+      const dx = circle.x - closestX;
+      const dy = circle.y - closestY;
+      return dx * dx + dy * dy < circle.r * circle.r;
+    }
+
+    function movePlayer(dx, dy) {
+      const previous = { x: player.x, y: player.y };
+      player.x = Math.max(10, Math.min(world.width - player.size - 10, player.x + dx));
+      player.y = Math.max(10, Math.min(world.height - player.size - 10, player.y + dy));
+      const box = { x: player.x, y: player.y, w: player.size, h: player.size };
+      if (walls.some((wall) => rectsOverlap(box, wall))) {
+        player.x = previous.x;
+        player.y = previous.y;
+      }
+    }
+
+    function handleInput(dt) {
+      let dx = 0;
+      let dy = 0;
+      if (keys.has("arrowleft") || keys.has("a")) dx -= 1;
+      if (keys.has("arrowright") || keys.has("d")) dx += 1;
+      if (keys.has("arrowup") || keys.has("w")) dy -= 1;
+      if (keys.has("arrowdown") || keys.has("s")) dy += 1;
+      const length = Math.hypot(dx, dy) || 1;
+      const boost = player.dash > 0 ? 2.3 : 1;
+      movePlayer((dx / length) * player.speed * boost * dt, (dy / length) * player.speed * boost * dt);
+    }
+
+    function updateBugs(dt) {
+      for (const bug of bugs) {
+        bug.x += bug.vx * dt;
+        bug.y += bug.vy * dt;
+        if (bug.vx && (bug.x < bug.minX || bug.x > bug.maxX)) bug.vx *= -1;
+        if (bug.vy && (bug.y < bug.minY || bug.y > bug.maxY)) bug.vy *= -1;
+      }
+    }
+
+    function updateGame(dt) {
+      handleInput(dt);
+      updateBugs(dt);
+      player.dash = Math.max(0, player.dash - dt);
+      player.invulnerable = Math.max(0, player.invulnerable - dt);
+      timerAccumulator += dt;
+      timeLeft -= dt;
+
+      const playerBox = { x: player.x, y: player.y, w: player.size, h: player.size };
+      for (const star of stars) {
+        if (!star.collected && circleRectOverlap(star, playerBox)) {
+          star.collected = true;
+          score += 125;
+        }
+      }
+
+      if (player.invulnerable <= 0) {
+        for (const bug of bugs) {
+          if (circleRectOverlap(bug, playerBox)) {
+            lives -= 1;
+            player.x = 74;
+            player.y = 76;
+            player.invulnerable = 1.25;
+            break;
+          }
+        }
+      }
+
+      const collectedAll = stars.every((star) => star.collected);
+      if (collectedAll && rectsOverlap(playerBox, gate)) {
+        score += Math.ceil(timeLeft) * 10;
+        endGame(true);
+      } else if (lives <= 0 || timeLeft <= 0) {
+        endGame(false);
+      }
+
+      updateHud();
+    }
+
+    function endGame(won) {
+      state = "ended";
+      overlay.hidden = false;
+      overlayTitle.textContent = won ? "Published!" : "Build Failed";
+      overlayText.textContent = won
+        ? `You collected every star and reached the deploy gate. Final score: ${score}.`
+        : "Try again: collect the stars, dodge the bugs, then enter the green gate.";
+      startButton.textContent = "Play Again";
+    }
+
+    function drawGrid() {
+      ctx.fillStyle = "#0d151c";
+      ctx.fillRect(0, 0, world.width, world.height);
+      ctx.strokeStyle = "rgba(130, 160, 180, 0.14)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= world.width; x += 48) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, world.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= world.height; y += 48) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(world.width, y);
+        ctx.stroke();
+      }
+    }
+
+    function drawWalls() {
+      for (const wall of walls) {
+        ctx.fillStyle = "#253b4b";
+        ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+        ctx.fillStyle = "#34566b";
+        ctx.fillRect(wall.x + 4, wall.y + 4, wall.w - 8, wall.h - 8);
+      }
+    }
+
+    function drawStar(star) {
+      if (star.collected) return;
+      ctx.save();
+      ctx.translate(star.x, star.y);
+      ctx.rotate(performance.now() / 500);
+      ctx.fillStyle = "#f7c948";
+      ctx.beginPath();
+      for (let i = 0; i < 10; i += 1) {
+        const radius = i % 2 === 0 ? star.r : star.r * 0.45;
+        const angle = (Math.PI * 2 * i) / 10 - Math.PI / 2;
+        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawGate() {
+      const ready = stars.every((star) => star.collected);
+      ctx.fillStyle = ready ? "#54d39b" : "#456271";
+      ctx.fillRect(gate.x, gate.y, gate.w, gate.h);
+      ctx.fillStyle = "#0d151c";
+      ctx.fillRect(gate.x + 12, gate.y + 14, gate.w - 24, gate.h - 20);
+      ctx.fillStyle = ready ? "#54d39b" : "#8fa3ad";
+      ctx.font = "700 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("PAGES", gate.x + gate.w / 2, gate.y + gate.h + 20);
+    }
+
+    function drawBugs() {
+      for (const bug of bugs) {
+        ctx.fillStyle = "#f06a6a";
+        ctx.beginPath();
+        ctx.arc(bug.x, bug.y, bug.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#2d1014";
+        ctx.fillRect(bug.x - 8, bug.y - 4, 5, 5);
+        ctx.fillRect(bug.x + 3, bug.y - 4, 5, 5);
+        ctx.strokeStyle = "#f06a6a";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(bug.x - 16, bug.y - 12);
+        ctx.lineTo(bug.x - 28, bug.y - 20);
+        ctx.moveTo(bug.x + 16, bug.y - 12);
+        ctx.lineTo(bug.x + 28, bug.y - 20);
+        ctx.stroke();
+      }
+    }
+
+    function drawPlayer() {
+      const flicker = player.invulnerable > 0 && Math.floor(performance.now() / 90) % 2 === 0;
+      if (flicker) return;
+      ctx.fillStyle = "#64b5f6";
+      ctx.fillRect(player.x, player.y, player.size, player.size);
+      ctx.fillStyle = "#f6f3e8";
+      ctx.fillRect(player.x + 6, player.y + 7, 5, 5);
+      ctx.fillRect(player.x + 16, player.y + 7, 5, 5);
+      ctx.fillStyle = "#101820";
+      ctx.fillRect(player.x + 7, player.y + 18, 12, 3);
+    }
+
+    function draw() {
+      drawGrid();
+      drawWalls();
+      drawGate();
+      stars.forEach(drawStar);
+      drawBugs();
+      drawPlayer();
+    }
+
+    function loop(timestamp) {
+      const dt = Math.min(0.033, (timestamp - lastTime) / 1000 || 0);
+      lastTime = timestamp;
+      if (state === "playing") updateGame(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+      resetGame();
+      state = "playing";
+      overlay.hidden = true;
+      startButton.textContent = "Start Game";
+    }
+
+    window.addEventListener("keydown", (event) => {
+      const key = event.key.toLowerCase();
+      if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "w", "a", "s", "d", "p"].includes(key)) {
+        event.preventDefault();
+      }
+      if (key === " " && state === "playing" && player.dash <= 0) {
+        player.dash = 0.16;
+      } else if (key === "p" && state === "playing") {
+        state = "paused";
+        overlay.hidden = false;
+        overlayTitle.textContent = "Paused";
+        overlayText.textContent = "Press Start Game to restart, or press P to continue.";
+        startButton.textContent = "Restart";
+      } else if (key === "p" && state === "paused") {
+        state = "playing";
+        overlay.hidden = true;
+      } else {
+        keys.add(key);
+      }
+    });
+
+    window.addEventListener("keyup", (event) => {
+      keys.delete(event.key.toLowerCase());
+    });
+
+    startButton.addEventListener("click", startGame);
+    resetGame();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
